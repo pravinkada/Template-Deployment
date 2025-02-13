@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restoran
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: restoran
+  template:
+    metadata:
+      labels:
+        app: restoran
+    spec:
+      containers:
+      - name: restoran
+        image: your-dockerhub-username/restoran:latest
+        ports:
+        - containerPort: 80
+
+---
