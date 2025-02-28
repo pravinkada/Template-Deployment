@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: restoran
-        image: your-dockerhub-username/restoran:latest
+        image: kadampravin/my-app:latest
         ports:
         - containerPort: 80
 
