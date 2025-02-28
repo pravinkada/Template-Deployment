@@ -8,7 +8,7 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf ./*
 
 # Copy the Restoran template files into the container
-COPY COPY bootstrap-restaurant-template /usr/share/nginx/html/
+COPY bootstrap-restaurant-template /usr/share/nginx/html/
 
 # Expose port 80
 EXPOSE 80
