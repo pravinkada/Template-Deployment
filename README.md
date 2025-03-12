@@ -1,182 +1,94 @@
-# Template-Deployment
+# CI/CD Pipeline for Kubernetes Deployment on Minikube
+
 ## Overview
-This project automates the deployment of the  template (a static website) on a Google Cloud Platform (GCP) Virtual Machine (VM) using a CI/CD pipeline with Jenkins, Docker, and Kubernetes. The Jenkins pipeline handles the build, push, and deployment process, while Kubernetes ensures the application's scalability and reliability.
+This project demonstrates a CI/CD pipeline using Jenkins to automate the deployment of an application on Kubernetes Minikube. The pipeline pulls source code from GitHub, builds a Docker image, pushes it to Docker Hub, and deploys it to Minikube using Kubernetes manifests.
+
+## Pipeline Stages
+The pipeline consists of the following stages:
+
+1. **Pull Code from GitHub**
+   - Clones the repository from GitHub.
+2. **Build Docker Image**
+   - Builds a Docker image from the source code.
+3. **Push Docker Image to Docker Hub**
+   - Pushes the built Docker image to Docker Hub.
+4. **Deploy to Minikube**
+   - Applies Kubernetes deployment manifest to deploy the application on Minikube.
 
 ## Prerequisites
-Before setting up the project, ensure you have the following:
+Before running the pipeline, ensure you have the following installed and configured:
 
-- A GCP account with billing enabled.
-- A GCP Compute Engine VM instance (Ubuntu 22.04 recommended).
-- Installed tools:
-  - `git`
-  - `docker`
-  - `jenkins`
-  - `kubectl`
-  - `minikube`
-## Setup Instructions
+- **Jenkins** with required plugins
+- **Minikube** running on your machine
+- **Docker** installed and configured
+- **kubectl** configured to manage the Minikube cluster
+- **GitHub repository** with the application code and deployment manifests
+- **Docker Hub account** with valid credentials stored in Jenkins
 
-### 1. Clone the Repository
-```sh
-cd ~
-git clone https://github.com/your-username/restoran-deployment.git
-cd restoran-deployment
-```
+## Jenkins Pipeline Configuration
+This pipeline is written in Jenkinsfile format. Below are the environment variables used in the pipeline:
 
-### 2. Set Up GCP VM Instance
-- Create a Compute Engine VM instance on GCP with the following specifications:
-  - OS: Ubuntu 22.04
-  - Machine Type: `e2-medium` (2 vCPUs, 4 GB RAM)
-  - Firewall: Allow HTTP and HTTPS traffic
-
-- SSH into the VM:
-```sh
-gcloud compute ssh your-vm-instance-name --zone your-zone
-```
-
-### 3. Install Required Tools on the VM
-```sh
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y docker.io git
-```
-
-#### Install Jenkins
-```sh
-wget -q -O - https://pkg.jenkins.io/debian/jenkins.io.key | sudo apt-key add -
-echo "deb http://pkg.jenkins.io/debian binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list
-sudo apt update
-sudo apt install -y openjdk-11-jdk jenkins
-sudo systemctl enable --now jenkins
-```
-
-#### Install Kubernetes (kubectl and Minikube)
-```sh
-curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
-minikube start --driver=docker
-```
-
-### 4. Configure Jenkins
-- Access Jenkins on `http://your-vm-external-ip:8080`.
-- Install recommended plugins and configure Jenkins.
-- Add credentials for Docker Hub and GitHub.
-- Set up Jenkins pipeline (explained below).
-
-## Repository Structure
-```
-restoran-deployment/
-├── Dockerfile
-├── jenkinsfile
-├── kubernetes/
-│   ├── deployment.yaml
-│   ├── service.yaml
-├── src/
-│   ├── index.html
-│   ├── assets/
-├── README.md
-```
-
-## Jenkins Pipeline
-The `Jenkinsfile` automates the CI/CD process with the following stages:
-
-1. **Clone Repository**: Pulls the latest code.
-2. **Build Docker Image**: Builds an image using `nginx:alpine`.
-3. **Push to Docker Hub**: Pushes the image to a Docker repository.
-4. **Deploy to Kubernetes**: Applies Kubernetes configurations.
-
-### Jenkinsfile Example
 ```groovy
 pipeline {
     agent any
+
     environment {
-        DOCKER_IMAGE = 'your-dockerhub-username/restoran:latest'
+        REPO_URL = "https://github.com/pravinkada/Template-Deployment.git"
+        IMAGE_NAME = "kadampravin/my-app"
+        K8S_DEPLOYMENT = "deployment.yaml"
+        KUBECONFIG = "/var/lib/jenkins/.kube/config"
     }
+
     stages {
-        stage('Clone Repository') {
+        stage('Pull Code from GitHub') {
             steps {
-                git 'https://github.com/your-username/restoran-deployment.git'
+                git branch: 'main', url: "${REPO_URL}"
             }
         }
+
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
+                sh 'docker build -t ${IMAGE_NAME}:latest .'
             }
         }
-        stage('Push to Docker Hub') {
+
+        stage('Push Docker Image to Docker Hub') {
             steps {
                 withDockerRegistry([credentialsId: 'docker-hub-credentials', url: '']) {
-                    sh 'docker push $DOCKER_IMAGE'
+                    sh 'docker push ${IMAGE_NAME}:latest'
                 }
             }
         }
-        stage('Deploy to Kubernetes') {
+
+        stage('Deploy to Minikube') {
             steps {
-                sh 'kubectl apply -f kubernetes/deployment.yaml'
-                sh 'kubectl apply -f kubernetes/service.yaml'
+                sh 'kubectl apply -f ${K8S_DEPLOYMENT}'
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful!"
+        }
+        failure {
+            echo "❌ Deployment failed!"
         }
     }
 }
 ```
 
-## Kubernetes Deployment
+## Running the Pipeline
+1. Configure Jenkins with the necessary plugins and credentials.
+2. Create a new Jenkins pipeline and use the above Jenkinsfile.
+3. Run the pipeline to automate the deployment process.
+4. Verify the deployment using:
+   ```sh
+   kubectl get pods
+   kubectl get services
+   ```
 
-### Deployment YAML (`deployment.yaml`)
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: restoran
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: restoran
-  template:
-    metadata:
-      labels:
-        app: restoran
-    spec:
-      containers:
-      - name: restoran
-        image: your-dockerhub-username/restoran:latest
-        ports:
-        - containerPort: 80
-```
-
-### Service YAML (`service.yaml`)
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: restoran-service
-spec:
-  selector:
-    app: restoran
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 80
-  type: LoadBalancer
-```
-
-## Access the Application
-- Get the external IP of the service:
-```sh
-kubectl get svc restoran-service
-```
-- Open the IP in your browser to access the website.
-
-## Clean Up
-To delete Kubernetes resources:
-```sh
-kubectl delete -f kubernetes/deployment.yaml
-kubectl delete -f kubernetes/service.yaml
-```
-To stop Minikube:
-```sh
-minikube stop
-
-
+## Troubleshooting
+- Ensure Minikube is running: `minikube status`
+- Verify Docker daemon is running: `docker ps`
+- Check logs for errors: `kubectl logs <pod-name>`
